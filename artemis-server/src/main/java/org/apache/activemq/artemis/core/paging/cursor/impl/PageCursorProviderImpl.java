@@ -241,6 +241,7 @@ public class PageCursorProviderImpl implements PageCursorProvider {
          cursor.stop();
       }
 
+      scheduleCleanup();
       waitForFuture();
    }
 
