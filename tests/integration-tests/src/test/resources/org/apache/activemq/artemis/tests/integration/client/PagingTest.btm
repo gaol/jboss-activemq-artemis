@@ -1,0 +1,8 @@
+RULE skip delete page complete record for page 120
+CLASS org.apache.activemq.artemis.core.paging.cursor.impl.PageSubscriptionImpl
+METHOD onDeletePage(Page)
+AT ENTRY
+IF $1.getPageId() == 120
+DO
+    RETURN
+ENDRULE

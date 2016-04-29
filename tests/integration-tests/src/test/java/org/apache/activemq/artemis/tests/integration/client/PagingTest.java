@@ -18,6 +18,7 @@ package org.apache.activemq.artemis.tests.integration.client;
 
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -72,10 +73,16 @@ import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.logs.AssertionLoggerHandler;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
+import org.jboss.byteman.contrib.bmunit.BMRule;
+import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
+import org.jboss.byteman.contrib.bmunit.BMUnitRunner;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
+@RunWith(BMUnitRunner.class)
+@BMUnitConfig(policy = true, debug = true, enforce = true)
 public class PagingTest extends ActiveMQTestBase {
 
    private ServerLocator locator;
@@ -1245,6 +1252,12 @@ public class PagingTest extends ActiveMQTestBase {
     * This test will remove all the page directories during a restart, simulating a crash scenario. The server should still start after this
     */
    @Test
+   @BMRule(targetClass = "org.apache.activemq.artemis.core.paging.cursor.impl.PageSubscriptionImpl",
+      targetMethod = "onDeletePage(Page)",
+      targetLocation = "AT ENTRY",
+      action = "RETURN",
+      condition = "$1.getPageId() == 120",
+      name = "skip delete page complete record for page 120")
    public void testDeletePhysicalPages() throws Exception {
       clearDataRecreateServerDirs();
 
