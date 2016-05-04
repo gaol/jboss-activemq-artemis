@@ -18,6 +18,7 @@ package org.apache.activemq.artemis.tests.integration.client;
 
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -46,6 +47,7 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.MessageHandler;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
+import org.apache.activemq.artemis.cli.commands.tools.PrintData;
 import org.apache.activemq.artemis.core.client.impl.ClientConsumerInternal;
 import org.apache.activemq.artemis.core.config.Configuration;
 import org.apache.activemq.artemis.core.config.DivertConfiguration;
@@ -4082,6 +4084,69 @@ public class PagingTest extends ActiveMQTestBase {
          catch (Throwable ignored) {
          }
       }
+   }
+
+   @Test
+   public void testStoreToPageOnly() throws Exception {
+	      clearDataRecreateServerDirs();
+
+	      Configuration config = createDefaultInVMConfig();
+
+	      server = createServer(true, config, PagingTest.PAGE_SIZE, PagingTest.PAGE_MAX, null);
+
+	      server.start();
+
+	      ServerLocator locator = null;
+	      ClientSessionFactory sf = null;
+	      ClientSession session = null;
+	      try {
+	         locator = createInVMNonHALocator().setBlockOnNonDurableSend(true).setBlockOnDurableSend(true);
+	         sf = locator.createSessionFactory();
+	         session = sf.createSession(false, false, false);
+	         session.createQueue(ADDRESS, ADDRESS, true);
+
+	         PagingStore store = server.getPagingManager().getPageStore(ADDRESS);
+
+	         ClientProducer producer = session.createProducer(PagingTest.ADDRESS);
+
+	         ClientMessage message = session.createMessage(true);
+	         message.getBodyBuffer().writeString("In Journal");
+	         message.putStringProperty("id", "1");
+	         message.putBooleanProperty("Paging", false);
+	         producer.send(message); // send before paging mode, message is stored in message journal
+	         session.commit();
+
+	         System.out.println("\n\n\n\n============= Before Paging enabled ======================\n\n\n\n\n");
+	         PrintData.printData(new File(getBindingsDir()), new File(getJournalDir()), getPageDirFile());
+	         System.out.println("\n\n\n\n======================================================\n\n\n\n\n");
+
+	         store.startPaging();
+
+             message = session.createMessage(true);
+             message.getBodyBuffer().writeString("In Paging");
+	         message.putStringProperty("id", "2");
+	         message.putBooleanProperty("Paging", true);
+             producer.send(message); // send on paging mode, message is stored in paging store
+
+	         session.commit();
+	         session.close();
+	         server.stop();
+
+	         System.out.println("\n\n\n\n============= After Paging enabled ======================\n\n\n\n\n");
+	         PrintData.printData(new File(getBindingsDir()), new File(getJournalDir()), getPageDirFile());
+	         System.out.println("\n\n\n\n======================================================\n\n\n\n\n");
+	         Queue q = null;
+	      }
+	      finally {
+	         session.close();
+	         sf.close();
+	         locator.close();
+	         try {
+	            server.stop();
+	         }
+	         catch (Throwable ignored) {
+	         }
+	      }
    }
 
    @Test
